@@ -1,0 +1,15 @@
+<RCC>
+    <qresource prefix="/sounds">
+    </qresource>
+    <qresource prefix="/images">
+        <file>fried-egg.png</file>
+        <file>ship.png</file>
+        <file>b.png</file>
+        <file>egg.png</file>
+        <file>chicken.png</file>
+        <file>hen.png</file>
+        <file>meat.png</file>
+        <file>gift.png</file>
+        <file>super-chicken.png</file>
+    </qresource>
+</RCC>
