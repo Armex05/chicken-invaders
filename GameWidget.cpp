@@ -6,7 +6,7 @@
 #include <QFont>
 
 GameWidget::GameWidget(QWidget *parent)
-        : QGraphicsView(parent), score(0), lives(3), leftPressed(false), rightPressed(false), upPressed(false), downPressed(false), chickensMoving(false) {
+        : QGraphicsView(parent), score(0), lives(3), leftPressed(false), rightPressed(false), upPressed(false), downPressed(false), chickensMoving(false),isPaused(false) {
     setMouseTracking(true);
 
     scene = new QGraphicsScene(this);
@@ -17,7 +17,7 @@ GameWidget::GameWidget(QWidget *parent)
     setScene(scene);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    setFixedSize(800,600);
+    setFixedSize(800,600);  //setting fix size to the scene to not get bigger
 
     ship = new QGraphicsPixmapItem(QPixmap(":/images/ship.png"));
     ship->setScale(0.15);
@@ -55,21 +55,39 @@ GameWidget::GameWidget(QWidget *parent)
     nextSeasonTimer =  new QTimer(this);
     connect(nextSeasonTimer,&QTimer::timeout, this,&GameWidget::nextSeason);
     nextSeasonTimer->setSingleShot(true);
-    nextSeasonTimer->start(28000);
+    nextSeasonTimer->start(28000);   // to go to the nest season(GameWidgetLevel2) after 28 secs of the game
+
+    pauseContinueButton = new QPushButton("Pause", this); // setting up the pause button
+    connect(pauseContinueButton,&QPushButton::clicked,this,&GameWidget::togglePauseContinue);
+    pauseContinueButton->setGeometry(10,50,80,30);
 }
 
 GameWidget::~GameWidget() {
     delete timer;
     delete chickenMovementTimer;
     delete invincibilityTimer;
+    delete scoreText;
+    delete livesText;
     //free all the memories that referred to the pointers
 }
+void GameWidget::togglePauseContinue() {
+    if (isPaused){
+        chickenMovementTimer->start();
+        secondChickenMovement->start();
+        isPaused = false;
+    }else{
+        chickenMovementTimer->stop();
+        secondChickenMovement->stop();
+        isPaused = true;
+    }
+}
 
-void GameWidget::nextSeason() {
+void GameWidget::nextSeason() { // hiding the scene of first season to show the scene for the second one
     this->hide();
     GameWidgetLevel2 *level2 = new GameWidgetLevel2;
     level2->show();
 }
+
 
 void GameWidget::keyPressEvent(QKeyEvent *event) {
     // the action of each key for keyboard
@@ -89,7 +107,7 @@ void GameWidget::keyPressEvent(QKeyEvent *event) {
             break;
         case Qt::Key_Space: {
             // generating the bullets by pressing space key
-            QGraphicsPixmapItem *bullet = new QGraphicsPixmapItem(QPixmap(":/images/b.png"));
+            QGraphicsPixmapItem *bullet = new QGraphicsPixmapItem(QPixmap(":/images/b.png")); // generating every new single bullet by pressing space button
             bullet->setScale(0.05);
             bullet->setPos(ship->x() + 30, ship->y());
             bullets.append(bullet);
@@ -121,30 +139,33 @@ void GameWidget::keyReleaseEvent(QKeyEvent *event) {
 }
 
 void GameWidget::mouseMoveEvent(QMouseEvent *event) {
-    ship->setPos(event->x() - ship->boundingRect().width() / 18, event->y() - ship->boundingRect().height() / 18);
+    ship->setPos(event->x() - ship->boundingRect().width() / 18, event->y() - ship->boundingRect().height() / 18); // divided by 18 for better control to the ship by mouse cursor
 }
 
 void GameWidget::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
         QGraphicsPixmapItem *bullet = new QGraphicsPixmapItem(QPixmap(":/images/b.png"));
-        bullet->setScale(0.05);
+        bullet->setScale(0.05); // it will make the actual image smaller by ratio of 0.05
         bullet->setPos(ship->x() + ship->boundingRect().width() / 2 - bullet->boundingRect().width() / 2, ship->y());
         bullets.append(bullet);
         scene->addItem(bullet);
     }
 }
 
-void GameWidget::gameLoop() {
-    updateShipPosition();
-    updateBullets();
-    if (chickensMoving) { //checks if the chickens were generated and on the moving form to update them,
-        updateChickens();
+void GameWidget::gameLoop() { // repeating the update of positions for every element after 16 m secs
+    if (!isPaused){
+        updateShipPosition();
+        updateBullets();
+        if (chickensMoving) { //checks if the chickens were generated and on the moving form to update them,
+            updateChickens();
+        }
+        checkCollisions();
+        scene->update();
     }
-    checkCollisions();
-    scene->update();
 }
 
-void GameWidget::startMovingChickens() {
+void GameWidget::startMovingChickens() { // the first group of chickens will start appearing after 4 secs by this slot
+    if (isPaused) return;
     chickensMoving = true;
 
     for (int i = 0; i < 20; ++i) {//chickens entering the scene by -250 y coordinates on the top.
@@ -152,12 +173,13 @@ void GameWidget::startMovingChickens() {
         int row = i / 5;
         QGraphicsPixmapItem *chicken = new QGraphicsPixmapItem(QPixmap(":/images/chicken.png"));
         chicken->setScale(0.1);
-        chicken->setPos(column * 80 + 200, row * 80 - 250);
+        chicken->setPos(column * 80 + 200, row * 80 - 250); //setting the positions base on the width and height of the scene
         chickens.append(chicken);
         scene->addItem(chicken);
     }
 }
-void GameWidget::startSecondMovingChickens() {
+void GameWidget::startSecondMovingChickens() { // the second batch of the chickens will appear after 14 seconds of the game by this function
+    if (isPaused) return;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 9; ++j) {
             QGraphicsPixmapItem *chicken = new QGraphicsPixmapItem(QPixmap(":/images/chicken.png"));
@@ -169,10 +191,11 @@ void GameWidget::startSecondMovingChickens() {
     }
 }
 void GameWidget::endInvincibility() {
-    shipInvincible = false;
+    shipInvincible = false; // this is used due to  the problem that I had for collision of ship and chickens, with this we can control the ship to no lose all its lives after one collision
 }
 
-void GameWidget::updateShipPosition() {
+void GameWidget::updateShipPosition() { //after clicking every button this function will do its job by the call of gameLoop func
+    if (isPaused) return;
     if (leftPressed) ship->setX(ship->x() - 5);
     if (rightPressed) ship->setX(ship->x() + 5);
     if (upPressed) ship->setY(ship->y() - 5);
@@ -183,11 +206,12 @@ void GameWidget::updateShipPosition() {
     }
 }
 
-void GameWidget::updateBullets() {
+void GameWidget::updateBullets() { // like all other updates
+    if (isPaused) return;
     for (QGraphicsPixmapItem *bullet : qAsConst(bullets)) {
         bullet->setY(bullet->y() - 2);
     }
-    bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [this](QGraphicsPixmapItem *bullet){
+    bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [this](QGraphicsPixmapItem *bullet){ // this part will delete the bullet from its list of bullets and the scene
         if (bullet->y() < 0) { // method for freeing the memory that we gave to the bullet
             scene->removeItem(bullet);
             delete bullet;
@@ -198,8 +222,9 @@ void GameWidget::updateBullets() {
 }
 
 void GameWidget::updateChickens() {
+    if (isPaused) return;
     for (int i = 0; i < chickens.size(); ++i){
-        if(chickens[i]->y() < scene->height() * 0.6 - 150){
+        if(chickens[i]->y() < scene->height() * 0.6 - 150){ // by this, if the chickens get to 2/3 of the view, they will be deleted( the 150 is because the chickens were added from negative coordinates to the scene.
             chickens[i]->setY(chickens[i]->y() + 1);
         }
         else{
@@ -213,7 +238,7 @@ void GameWidget::updateChickens() {
 void GameWidget::checkCollisions() {
     for (int i = 0; i < bullets.size(); ++i) {
         for (int j = 0; j < chickens.size(); ++j) {
-            if (bullets[i]->collidesWithItem(chickens[j])) {
+            if (bullets[i]->collidesWithItem(chickens[j])) { // the method for checking the collision of every single bullet and chicken inside the scene
                 scene->removeItem(bullets[i]);
                 scene->removeItem(chickens[j]);
                 delete bullets[i];
@@ -234,7 +259,7 @@ void GameWidget::checkCollisions() {
         }
     }
     if (!shipInvincible){
-        for (QGraphicsPixmapItem *chicken : qAsConst(chickens)) {
+        for (QGraphicsPixmapItem *chicken : qAsConst(chickens)) { // controlling the ship for 2 seconds after colliding with every chicken to not lose all its lives
             if (chicken->collidesWithItem(ship)) {
                 handleCollision();
                 invincibilityTimer = new QTimer(this);
@@ -246,8 +271,8 @@ void GameWidget::checkCollisions() {
         }
     }
 }
-void GameWidget::handleCollision() {
-    lives -= 1;
+void GameWidget::handleCollision() { // after the previous function, this slot will be called to get one of the lives
+    lives -= 1;                      // and also updating the text score for the user
     scene->removeItem(livesText);
     delete livesText;
     livesText = new QGraphicsTextItem();
@@ -271,8 +296,9 @@ void GameWidget::handleCollision() {
     shipInvincible = true;
 }
 
-GameWidget::GameWidget(QWidget *parent, int n)
+GameWidget::GameWidget(QWidget *parent, int n) // the second constructor was my solution for making the program object orienting to use as the parent constructor in the next seasons
     : QGraphicsView(parent), score(0), lives(3), leftPressed(false), rightPressed(false), upPressed(false), downPressed(false), chickensMoving(false) {
+    // this constructor doesn't get the information that should be override in the next season
         setMouseTracking(true);
 
         scene = new QGraphicsScene(this);
