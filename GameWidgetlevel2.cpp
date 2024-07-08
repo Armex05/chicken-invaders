@@ -315,7 +315,7 @@ void GameWidgetLevel2::decreaseChickenHealth(QGraphicsPixmapItem* chicken) {//be
         chickens.removeOne(chicken);
         delete chicken;
     } else {
-        chicken->setData(0, health); // Update the health data
+        chicken->setData(0, health); // Update the health data.
         return;
     }
 }

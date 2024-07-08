@@ -18,7 +18,7 @@ private slots:
     void startMovingChickens();
     void nextSeason();
     void startSecondMovingChickens();
-    void togglePauseContinue(); //pause option to manage the pause and continue...
+    void togglePauseContinue(); //pause option to manage the pause and continue..
 
 private:
     void updateEggs();
